@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Pollution Reporter — Public Map{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h1>Shared pollution reports <span class="muted">({{ total_count }} total)</span></h1>
+
+  <form class="filters" method="get">
+    <label>
+      Category
+      <select name="category" onchange="this.form.submit()">
+        <option value="">All categories</option>
+        {% for c in categories %}
+          <option value="{{ c }}" {% if c == selected_category %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Since
+      <input type="date" name="since" value="{{ since }}" onchange="this.form.submit()">
+    </label>
+    {% if selected_category or since %}
+      <a class="clear-link" href="{{ url_for('index') }}">Clear filters</a>
+    {% endif %}
+  </form>
+
+  <div id="map"></div>
+</section>
+
+<section class="panel">
+  <h2>Recent reports</h2>
+  {% if not reports %}
+    <p class="muted">No reports match these filters yet.</p>
+  {% endif %}
+  <div class="report-grid">
+    {% for r in reports %}
+      <article class="card" id="report-{{ r.id }}">
+        <img src="{{ url_for('static', filename=r.photo_path) }}" alt="{{ r.category }}">
+        <div class="card-body">
+          <div class="badge-row">
+            <span class="badge cat">{{ r.category }}</span>
+            <span class="badge sev sev-{{ r.severity }}">{{ r.severity }}</span>
+          </div>
+          <p class="desc">{{ r.description }}</p>
+          {% if r.note %}<p class="note">“{{ r.note }}”</p>{% endif %}
+          <p class="meta">
+            {{ r.submitted_at[:10] }} · confidence {{ (r.confidence * 100) | round | int }}%
+            {% if r.status == 'flagged' %}· <span class="flagged">flagged for review</span>{% endif %}
+          </p>
+          <form method="post" action="{{ url_for('flag_report', report_id=r.id) }}">
+            <button type="submit" class="link-btn">Flag as inaccurate ({{ r.flag_count }})</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const REPORTS = {{ reports_json | safe }};
+  const map = L.map('map').setView([{{ map_center.lat }}, {{ map_center.lng }}], 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  const severityColor = { low: '#4a9d4a', medium: '#d99a1f', high: '#c0392b' };
+
+  REPORTS.forEach(r => {
+    const marker = L.circleMarker([r.latitude, r.longitude], {
+      radius: 9,
+      color: severityColor[r.severity] || '#555',
+      fillColor: severityColor[r.severity] || '#555',
+      fillOpacity: 0.85,
+      weight: 1,
+    }).addTo(map);
+    marker.bindPopup(
+      `<strong>${r.category}</strong><br>${r.description || ''}` +
+      `<br><small>${r.submitted_at.slice(0,10)} · severity: ${r.severity}</small>`
+    );
+    marker.on('click', () => {
+      const card = document.getElementById('report-' + r.id);
+      if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  });
+</script>
+{% endblock %}

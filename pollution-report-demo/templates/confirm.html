@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Confirm category{% endblock %}
+
+{% block content %}
+<section class="panel narrow">
+  <h1>Confirm the category</h1>
+  <p class="muted">
+    The AI wasn't confident enough to save this automatically
+    ({{ (pending.confidence * 100) | round | int }}% confidence, suggested
+    "{{ pending.category }}"). Please pick the category that best matches the photo.
+  </p>
+
+  <img class="preview" src="{{ url_for('static', filename=pending.photo_path) }}" alt="Uploaded photo">
+  <p class="desc">{{ pending.description }}</p>
+
+  <form method="post" class="report-form">
+    <label class="field">
+      Category
+      <select name="category" required>
+        {% for c in categories %}
+          <option value="{{ c }}" {% if c == pending.category %}selected{% endif %}>{{ c }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="primary">Confirm and save report</button>
+  </form>
+</section>
+{% endblock %}

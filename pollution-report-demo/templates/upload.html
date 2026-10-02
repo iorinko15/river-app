@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Report pollution{% endblock %}
+
+{% block content %}
+<section class="panel narrow">
+  <h1>Report pollution</h1>
+  <p class="muted">Take or upload a photo, confirm the location, and submit — an AI will suggest a
+    category automatically.</p>
+
+  <form method="post" enctype="multipart/form-data" class="report-form">
+    <label class="field">
+      Photo
+      <input type="file" name="photo" accept="image/*" capture="environment" required>
+    </label>
+
+    <label class="field">
+      Optional note
+      <textarea name="note" maxlength="500" placeholder="Anything worth mentioning?"></textarea>
+    </label>
+
+    <div class="field">
+      <span>Location</span>
+      <div class="location-row">
+        <button type="button" id="locate-btn">📍 Use my location</button>
+        <span id="location-status" class="muted">No location set yet</span>
+      </div>
+      <div id="pin-map"></div>
+      <p class="muted small">Or click the map to drop/move the pin.</p>
+      <input type="hidden" name="latitude" id="latitude" required>
+      <input type="hidden" name="longitude" id="longitude" required>
+    </div>
+
+    <button type="submit" class="primary">Submit report</button>
+  </form>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const map = L.map('pin-map').setView([{{ map_center.lat }}, {{ map_center.lng }}], 12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }).addTo(map);
+
+  let marker = null;
+  const latInput = document.getElementById('latitude');
+  const lngInput = document.getElementById('longitude');
+  const statusEl = document.getElementById('location-status');
+
+  function setPin(lat, lng, label) {
+    latInput.value = lat;
+    lngInput.value = lng;
+    statusEl.textContent = label || `Pin set at ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (marker) {
+      marker.setLatLng([lat, lng]);
+    } else {
+      marker = L.marker([lat, lng], { draggable: true }).addTo(map);
+      marker.on('dragend', () => {
+        const p = marker.getLatLng();
+        setPin(p.lat, p.lng);
+      });
+    }
+    map.setView([lat, lng], 15);
+  }
+
+  map.on('click', (e) => setPin(e.latlng.lat, e.latlng.lng));
+
+  document.getElementById('locate-btn').addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      statusEl.textContent = 'Geolocation not supported — click the map instead.';
+      return;
+    }
+    statusEl.textContent = 'Locating…';
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setPin(pos.coords.latitude, pos.coords.longitude, 'Using your current location'),
+      () => { statusEl.textContent = 'Location denied — click the map to drop a pin instead.'; }
+    );
+  });
+</script>
+{% endblock %}
